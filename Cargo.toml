@@ -1,0 +1,10 @@
+[package]
+name = "httpstat"
+version = "0.1.0"
+authors = ["Tyrone Tudehope <tyronetudehope@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+curl = { version = "0.4.38", features = ["ssl", "http2", "static-ssl", "static-curl"] }
+eyre = "0.6.5"
+nanoid = "0.4.0"
