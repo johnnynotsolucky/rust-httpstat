@@ -7,4 +7,6 @@ edition = "2018"
 [dependencies]
 curl = { version = "0.4.38", features = ["ssl", "http2", "static-ssl", "static-curl"] }
 eyre = "0.6.5"
+thiserror = "1.0.26"
 nanoid = "0.4.0"
+structopt = "0.3.22"

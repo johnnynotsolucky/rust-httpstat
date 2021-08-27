@@ -3,118 +3,128 @@ use nanoid::nanoid;
 use std::env;
 use std::fs::File;
 use std::io::Write;
-use std::rc::Rc;
-use std::str;
 use std::time::Duration;
+use structopt::StructOpt;
 
-type ColorFormatter = Box<dyn Fn(String) -> String>;
+use httpstat::{httpstat, Config};
 
-struct Colors {
-    green: ColorFormatter,
-    yellow: ColorFormatter,
-    cyan: ColorFormatter,
-    gray: ColorFormatter,
+#[derive(Debug, Clone, StructOpt)]
+#[structopt()]
+struct Opt {
+	#[structopt(short = "L", long = "location")]
+	/// Follow redirects
+	location: bool,
+
+	#[structopt(long = "connect-timeout")]
+	/// <seconds> Maximum time allowed for connection
+	connect_timeout: Option<i32>,
+
+	// TODO make enum
+	#[structopt(short = "X", long = "request", default_value = "GET")]
+	/// Specify request command to use
+	request: String,
+
+	#[structopt(short = "d", long = "data")]
+	/// HTTP POST data
+	data: Option<String>,
+
+	#[structopt(short = "H", long = "header")]
+	/// Pass custom header(s) to server
+	headers: Option<Vec<String>>,
+
+	#[structopt(short = "k", long = "insecure")]
+	/// Allow insecure server connections when using SSL
+	insecure: bool,
+
+	/// URL to work with
+	url: String,
+
+	#[structopt(short = "o", long = "save-body")]
+	save_body: bool,
+
+	#[structopt(short = "v", long = "verbose")]
+	/// Verbose output
+	verbose: bool,
 }
 
-impl Colors {
-    fn make_color(c: u8) -> ColorFormatter {
-        Box::new(move |s| format!("\x1b[{}m{}\x1b[0m", c, s))
-    }
-
-    fn new() -> Self {
-        Colors {
-            green: Self::make_color(32),
-            yellow: Self::make_color(33),
-            cyan: Self::make_color(36),
-            gray: Self::make_color(38),
-        }
-    }
+impl From<Opt> for Config {
+	fn from(opt: Opt) -> Self {
+		Self {
+			location: opt.location,
+			connect_timeout: opt.connect_timeout,
+			request: opt.request,
+			data: opt.data,
+			headers: opt.headers,
+			insecure: opt.insecure,
+			url: opt.url,
+			verbose: opt.verbose,
+		}
+	}
 }
 
-type TimeFormatter = Box<dyn Fn(Duration) -> String>;
+type ColorFormatter = fn(String) -> String;
 
-fn make_a_formatter(c: Rc<Colors>) -> TimeFormatter {
-    Box::new(move |x| (c.cyan)(format!("{:^7}", format!("{:.0}ms", x.as_millis()))))
+macro_rules! make_color {
+	($e:expr) => {
+		|s: String| format!("\x1b[{}m{}\x1b[0m", $e, s)
+	};
 }
 
-fn make_b_formatter(c: Rc<Colors>) -> TimeFormatter {
-    Box::new(move |x| (c.cyan)(format!("{:<7}", format!("{:.0}ms", x.as_millis()))))
+macro_rules! make_color_formatter {
+	($color:expr, $format: expr) => {
+		|duration: Duration| $color(format!($format, format!("{:.0}ms", duration.as_millis())))
+	};
 }
 
-fn main() -> Result<()> {
-    let url = "https://httpbin.org/get";
+const GREEN: ColorFormatter = make_color!(32);
+const YELLOW: ColorFormatter = make_color!(33);
+const CYAN: ColorFormatter = make_color!(36);
+const GRAY: ColorFormatter = make_color!(38);
 
-    let colors = Rc::new(Colors::new());
+fn execute() -> Result<()> {
+	let opt = Opt::from_args();
+	let result = httpstat(Config::from(opt.clone()))?;
 
-    let mut handle = curl::easy::Easy::new();
+	if let Some(http_response_header) = result.http_response_header {
+		println!(
+			"{}{}{}",
+			GREEN("HTTP".into()),
+			GRAY("/".into()),
+			CYAN(format!(
+				"{} {} {}",
+				http_response_header.http_version,
+				http_response_header.response_code,
+				if let Some(msg) = http_response_header.response_message {
+					msg
+				} else {
+					"".into()
+				},
+			)),
+		);
+	}
 
-    handle.url(url)?;
-    handle.show_header(true)?;
-    handle.verbose(false)?;
+	for header in result.headers.iter() {
+		println!(
+			"{}{}",
+			GRAY(format!("{}: ", header.name)),
+			CYAN(header.value.to_owned()),
+		);
+	}
 
-    let mut body = Vec::new();
-    let mut headers = Vec::new();
-    {
-        let mut transfer = handle.transfer();
-        transfer.write_function(|data| {
-            body.extend_from_slice(data);
-            Ok(data.len())
-        })?;
+	if opt.save_body {
+		let tmpfile_name = nanoid!(6, &nanoid::alphabet::SAFE); //=> "93ce_Ltuub"
+		let tmpfile_path = format!("{}/tmp{}", env::temp_dir().to_str().unwrap(), tmpfile_name);
+		let mut tmpfile = File::create(tmpfile_path.clone())?;
+		tmpfile.write_all(&result.body[..])?;
+		println!("\n{} stored in {}", GREEN("Body".to_string()), tmpfile_path);
+	}
 
-        transfer.header_function(|header| {
-            headers.push(str::from_utf8(header).unwrap().to_string());
-            true
-        })?;
+	let format_a = make_color_formatter!(CYAN, "{:^7}"); //make_a_formatter();
+	let format_b = make_color_formatter!(CYAN, "{:<7}"); //make_b_formatter();
 
-        transfer.perform()?;
-    }
-
-    for (idx, header) in headers.iter().enumerate() {
-        if idx == 0 {
-            let header_tuple = header.split_once('/').unwrap();
-            let header_name: String = header_tuple.0.into();
-            let header_value: String = header_tuple.1.into();
-
-            println!(
-                "{}{}{}",
-                (colors.green)(header_name),
-                (colors.gray)("/".into()),
-                (colors.cyan)(header_value.trim().replace("\r", "").replace("\n", "")),
-            );
-        } else if !header.trim().is_empty() {
-            let header_tuple: (&str, &str) = header.split_once(':').unwrap();
-            let header_name: String = header_tuple.0.into();
-            let header_value: String = header_tuple.1.into();
-            println!(
-                "{}{}",
-                (colors.gray)(format!("{}: ", header_name)),
-                (colors.cyan)(header_value.trim().replace("\r", "").replace("\n", "")),
-            );
-        }
-    }
-
-    let tmpfile_name = nanoid!(6, &nanoid::alphabet::SAFE); //=> "93ce_Ltuub"
-    let tmpfile_path = format!("{}/tmp{}", env::temp_dir().to_str().unwrap(), tmpfile_name);
-    let mut tmpfile = File::create(tmpfile_path.clone())?;
-    tmpfile.write_all(&body[..])?;
-    println!(
-        "\n{} stored in {}",
-        (colors.green)("Body".to_string()),
-        tmpfile_path
-    );
-
-    let namelookup_time = handle.namelookup_time()?;
-    let connect_time = handle.connect_time()?;
-    let pretransfer_time = handle.pretransfer_time()?;
-    let starttransfer_time = handle.starttransfer_time()?;
-    let total_time = handle.total_time()?;
-
-    let format_a = make_a_formatter(colors.clone());
-    let format_b = make_b_formatter(colors);
-
-    let output = if url.starts_with("https") {
-        format!(
-            r#"
+	let output = if opt.url.starts_with("https") {
+		format!(
+			r#"
   DNS Lookup   TCP Connection   TLS Handshake   Server Processing   Content Transfer
 [   {a0000}  |     {a0001}    |    {a0002}    |      {a0003}      |      {a0004}     ]
              |                |               |                   |                  |
@@ -124,20 +134,20 @@ fn main() -> Result<()> {
                                                       starttransfer:{b0003}          |
                                                                                  total:{b0004}
 "#,
-            a0000 = format_a(namelookup_time),
-            a0001 = format_a(connect_time - namelookup_time),
-            a0002 = format_a(pretransfer_time - connect_time),
-            a0003 = format_a(starttransfer_time - pretransfer_time),
-            a0004 = format_a(total_time - starttransfer_time),
-            b0000 = format_b(namelookup_time),
-            b0001 = format_b(connect_time),
-            b0002 = format_b(pretransfer_time),
-            b0003 = format_b(starttransfer_time),
-            b0004 = format_b(total_time)
-        )
-    } else {
-        format!(
-            r#"
+			a0000 = format_a(result.timing.namelookup_time),
+			a0001 = format_a(result.timing.connect_time - result.timing.namelookup_time),
+			a0002 = format_a(result.timing.pretransfer_time - result.timing.connect_time),
+			a0003 = format_a(result.timing.starttransfer_time - result.timing.pretransfer_time),
+			a0004 = format_a(result.timing.total_time - result.timing.starttransfer_time),
+			b0000 = format_b(result.timing.namelookup_time),
+			b0001 = format_b(result.timing.connect_time),
+			b0002 = format_b(result.timing.pretransfer_time),
+			b0003 = format_b(result.timing.starttransfer_time),
+			b0004 = format_b(result.timing.total_time)
+		)
+	} else {
+		format!(
+			r#"
   DNS Lookup   TCP Connection   Server Processing   Content Transfer
 [   {a0000}  |     {a0001}    |      {a0003}      |      {a0004}     ]
              |                |                   |                  |
@@ -146,17 +156,23 @@ fn main() -> Result<()> {
                                       starttransfer:{b0003}          |
                                                                  total:{b0004}
 "#,
-            a0000 = format_a(namelookup_time),
-            a0001 = format_a(connect_time - namelookup_time),
-            a0003 = format_a(starttransfer_time - pretransfer_time),
-            a0004 = format_a(total_time - starttransfer_time),
-            b0000 = format_b(namelookup_time),
-            b0001 = format_b(connect_time),
-            b0003 = format_b(starttransfer_time),
-            b0004 = format_b(total_time)
-        )
-    };
+			a0000 = format_a(result.timing.namelookup_time),
+			a0001 = format_a(result.timing.connect_time - result.timing.namelookup_time),
+			a0003 = format_a(result.timing.starttransfer_time - result.timing.pretransfer_time),
+			a0004 = format_a(result.timing.total_time - result.timing.starttransfer_time),
+			b0000 = format_b(result.timing.namelookup_time),
+			b0001 = format_b(result.timing.connect_time),
+			b0003 = format_b(result.timing.starttransfer_time),
+			b0004 = format_b(result.timing.total_time)
+		)
+	};
 
-    println!("{}", output);
-    Ok(())
+	println!("{}", output);
+	Ok(())
+}
+
+fn main() {
+	if let Err(err) = execute() {
+		println!("{}", YELLOW(err.to_string()));
+	}
 }
