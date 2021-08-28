@@ -30,7 +30,7 @@ OPTIONS:
     -X, --request <command>           Specify request command to use [default: GET]
     -d, --data <data>                 HTTP POST data
     -H, --header <headers>...         Pass custom header(s) to server
-        --connect-timeout <millis>    <seconds> Maximum time allowed for connection
+        --connect-timeout <millis>    Maximum time allowed for connection
 
 ARGS:
     <url>    URL to work with

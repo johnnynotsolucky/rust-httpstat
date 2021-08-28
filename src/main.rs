@@ -16,7 +16,7 @@ struct Opt {
 	location: bool,
 
 	#[structopt(name = "millis", long = "connect-timeout")]
-	/// <seconds> Maximum time allowed for connection
+	/// Maximum time allowed for connection
 	connect_timeout: Option<u64>,
 
 	#[structopt(name = "command", short = "X", long = "request", default_value = "GET")]
