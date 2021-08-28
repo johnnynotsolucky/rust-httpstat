@@ -15,12 +15,11 @@ struct Opt {
 	/// Follow redirects
 	location: bool,
 
-	#[structopt(long = "connect-timeout")]
+	#[structopt(name = "millis", long = "connect-timeout")]
 	/// <seconds> Maximum time allowed for connection
-	connect_timeout: Option<i32>,
+	connect_timeout: Option<u64>,
 
-	// TODO make enum
-	#[structopt(short = "X", long = "request", default_value = "GET")]
+	#[structopt(name = "command", short = "X", long = "request", default_value = "GET")]
 	/// Specify request command to use
 	request: String,
 
@@ -36,22 +35,22 @@ struct Opt {
 	/// Allow insecure server connections when using SSL
 	insecure: bool,
 
-	/// URL to work with
-	url: String,
-
 	#[structopt(short = "o", long = "save-body")]
 	save_body: bool,
 
 	#[structopt(short = "v", long = "verbose")]
 	/// Verbose output
 	verbose: bool,
+
+	/// URL to work with
+	url: String,
 }
 
 impl From<Opt> for Config {
 	fn from(opt: Opt) -> Self {
 		Self {
 			location: opt.location,
-			connect_timeout: opt.connect_timeout,
+			connect_timeout: opt.connect_timeout.map(Duration::from_millis),
 			request: opt.request,
 			data: opt.data,
 			headers: opt.headers,

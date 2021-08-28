@@ -14,11 +14,10 @@ pub enum Error {
 
 pub struct Config {
 	pub location: bool,
-	pub connect_timeout: Option<i32>,
+	pub connect_timeout: Option<Duration>,
 	pub request: String,
 	pub data: Option<String>,
 	pub headers: Option<Vec<String>>,
-	// ssl_verify_host & ssl_verify_peer
 	pub insecure: bool,
 	pub url: String,
 	pub verbose: bool,
@@ -34,7 +33,7 @@ impl From<String> for Header {
 		let header_tuple: (&str, &str) = line.split_once(':').unwrap();
 		Self {
 			name: header_tuple.0.into(),
-			value: header_tuple.1.trim().replace("\r", "").replace("\n", ""),
+			value: header_tuple.1.trim().into(),
 		}
 	}
 }
@@ -85,6 +84,19 @@ pub fn httpstat(config: Config) -> Result<StatResult> {
 	handle.show_header(true)?;
 	handle.verbose(config.verbose)?;
 
+	if config.insecure {
+		handle.ssl_verify_host(false)?;
+		handle.ssl_verify_peer(false)?;
+	}
+
+	if config.location {
+		handle.follow_location(true)?;
+	}
+
+	if let Some(connect_timeout) = config.connect_timeout {
+		handle.connect_timeout(connect_timeout)?;
+	}
+
 	handle.custom_request(&config.request.to_uppercase())?;
 
 	let post_data = if let Some(ref data) = config.data {
@@ -115,10 +127,7 @@ pub fn httpstat(config: Config) -> Result<StatResult> {
 	{
 		let mut transfer = handle.transfer();
 
-		transfer.read_function(move |into| {
-			// println!("{}", post_data);
-			Ok(post_data.as_bytes().read(into).unwrap())
-		})?;
+		transfer.read_function(move |into| Ok(post_data.as_bytes().read(into).unwrap()))?;
 
 		transfer.write_function(|data| {
 			body.extend_from_slice(data);
@@ -137,10 +146,15 @@ pub fn httpstat(config: Config) -> Result<StatResult> {
 	let mut http_response_header: Option<HttpResponseHeader> = None;
 	let mut headers: Vec<Header> = Vec::new();
 
-	for (idx, line) in header_lines.iter().enumerate() {
-		if idx == 0 {
+	let header_iter = header_lines
+		.iter()
+		.map(|line| line.replace("\r", "").replace("\n", ""))
+		.filter(|line| !line.is_empty());
+
+	for line in header_iter {
+		if line.to_uppercase().starts_with("HTTP/") {
 			http_response_header = Some(HttpResponseHeader::from(line.to_string()));
-		} else if !line.trim().is_empty() {
+		} else {
 			headers.push(Header::from(line.to_string()));
 		}
 	}
