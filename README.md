@@ -38,6 +38,7 @@ ARGS:
 
 ## TODO
 
+- [ ] `httpform`
 - [ ] Enable proxies
 - [ ] Custom certificates
 
