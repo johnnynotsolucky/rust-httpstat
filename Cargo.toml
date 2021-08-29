@@ -5,8 +5,14 @@ authors = ["Tyrone Tudehope <tyronetudehope@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-curl = { version = "0.4.38", features = ["ssl", "http2", "static-ssl", "static-curl"] }
-eyre = "0.6.5"
-thiserror = "1.0.26"
-nanoid = "0.4.0"
-structopt = "0.3.22"
+curl = { version = "0.4" }
+eyre = "0.6"
+nanoid = "0.4"
+structopt = "0.3"
+thiserror = "1.0"
+
+[features]
+ssl = ["curl/ssl"]
+http2 = ["curl/http2"]
+static-ssl = ["curl/static-ssl"]
+static-curl = ["curl/static-curl"]

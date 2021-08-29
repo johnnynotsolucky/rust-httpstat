@@ -12,6 +12,7 @@ pub enum Error {
 	FromStrError(String),
 }
 
+#[derive(Debug, Clone)]
 pub struct Config {
 	pub location: bool,
 	pub connect_timeout: Option<Duration>,
@@ -23,6 +24,22 @@ pub struct Config {
 	pub verbose: bool,
 }
 
+impl Default for Config {
+	fn default() -> Self {
+		Self {
+			location: false,
+			connect_timeout: None,
+			request: "GET".into(),
+			data: None,
+			headers: None,
+			insecure: false,
+			url: "".into(),
+			verbose: false,
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
 pub struct Header {
 	pub name: String,
 	pub value: String,
@@ -38,6 +55,7 @@ impl From<String> for Header {
 	}
 }
 
+#[derive(Debug, Clone)]
 pub struct HttpResponseHeader {
 	pub http_version: String,
 	pub response_code: i32,
@@ -62,6 +80,7 @@ impl From<String> for HttpResponseHeader {
 	}
 }
 
+#[derive(Debug, Clone)]
 pub struct Timing {
 	pub namelookup_time: Duration,
 	pub connect_time: Duration,
@@ -70,6 +89,7 @@ pub struct Timing {
 	pub total_time: Duration,
 }
 
+#[derive(Debug, Clone)]
 pub struct StatResult {
 	pub http_response_header: Option<HttpResponseHeader>,
 	pub headers: Vec<Header>,
