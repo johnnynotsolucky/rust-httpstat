@@ -1,5 +1,6 @@
 use curl::easy::{Easy, List};
 use eyre::Result;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
 use std::str;
@@ -39,7 +40,7 @@ impl Default for Config {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Header {
 	pub name: String,
 	pub value: String,
@@ -55,7 +56,7 @@ impl From<String> for Header {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct HttpResponseHeader {
 	pub http_version: String,
 	pub response_code: i32,
@@ -80,7 +81,7 @@ impl From<String> for HttpResponseHeader {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Timing {
 	pub namelookup_time: Duration,
 	pub connect_time: Duration,
@@ -89,9 +90,11 @@ pub struct Timing {
 	pub total_time: Duration,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StatResult {
-	pub http_response_header: Option<HttpResponseHeader>,
+	pub http_version: String,
+	pub response_code: i32,
+	pub response_message: Option<String>,
 	pub headers: Vec<Header>,
 	pub timing: Timing,
 	pub body: Vec<u8>,
@@ -180,7 +183,9 @@ pub fn httpstat(config: Config) -> Result<StatResult> {
 	}
 
 	Ok(StatResult {
-		http_response_header,
+		http_version: http_response_header.as_ref().map_or_else(|| "Unknown".into(), |h| h.http_version.clone()),
+		response_code: http_response_header.as_ref().map_or(-1, |h| h.response_code),
+		response_message: http_response_header.as_ref().map_or(None, |h| h.response_message.clone()),
 		headers,
 		body,
 		timing: Timing {

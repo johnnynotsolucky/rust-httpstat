@@ -84,23 +84,21 @@ fn execute() -> Result<()> {
 	let opt = Opt::from_args();
 	let result = httpstat(Config::from(opt.clone()))?;
 
-	if let Some(http_response_header) = result.http_response_header {
-		println!(
-			"{}{}{}",
-			GREEN("HTTP".into()),
-			GRAY("/".into()),
-			CYAN(format!(
-				"{} {} {}",
-				http_response_header.http_version,
-				http_response_header.response_code,
-				if let Some(msg) = http_response_header.response_message {
-					msg
-				} else {
-					"".into()
-				},
-			)),
-		);
-	}
+	println!(
+		"{}{}{}",
+		GREEN("HTTP".into()),
+		GRAY("/".into()),
+		CYAN(format!(
+			"{} {} {}",
+			result.http_version,
+			result.response_code,
+			if let Some(msg) = result.response_message {
+				msg
+			} else {
+				"".into()
+			},
+		)),
+	);
 
 	for header in result.headers.iter() {
 		println!(
