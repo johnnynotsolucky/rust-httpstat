@@ -131,11 +131,11 @@ fn execute() -> Result<()> {
                                                       starttransfer:{b0003}          |
                                                                                  total:{b0004}
 "#,
-			a0000 = format_a(result.timing.namelookup_time),
-			a0001 = format_a(result.timing.connect_time - result.timing.namelookup_time),
-			a0002 = format_a(result.timing.pretransfer_time - result.timing.connect_time),
-			a0003 = format_a(result.timing.starttransfer_time - result.timing.pretransfer_time),
-			a0004 = format_a(result.timing.total_time - result.timing.starttransfer_time),
+			a0000 = format_a(result.timing.dns_resolution_time),
+			a0001 = format_a(result.timing.tcp_connection_time),
+			a0002 = format_a(result.timing.tls_connection_time),
+			a0003 = format_a(result.timing.server_processing_time),
+			a0004 = format_a(result.timing.content_transfer_time),
 			b0000 = format_b(result.timing.namelookup_time),
 			b0001 = format_b(result.timing.connect_time),
 			b0002 = format_b(result.timing.pretransfer_time),
@@ -153,10 +153,10 @@ fn execute() -> Result<()> {
                                       starttransfer:{b0003}          |
                                                                  total:{b0004}
 "#,
-			a0000 = format_a(result.timing.namelookup_time),
-			a0001 = format_a(result.timing.connect_time - result.timing.namelookup_time),
-			a0003 = format_a(result.timing.starttransfer_time - result.timing.pretransfer_time),
-			a0004 = format_a(result.timing.total_time - result.timing.starttransfer_time),
+			a0000 = format_a(result.timing.dns_resolution_time),
+			a0001 = format_a(result.timing.tcp_connection_time),
+			a0003 = format_a(result.timing.server_processing_time),
+			a0004 = format_a(result.timing.content_transfer_time),
 			b0000 = format_b(result.timing.namelookup_time),
 			b0001 = format_b(result.timing.connect_time),
 			b0003 = format_b(result.timing.starttransfer_time),

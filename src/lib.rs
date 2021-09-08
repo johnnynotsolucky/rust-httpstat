@@ -88,6 +88,39 @@ pub struct Timing {
 	pub pretransfer_time: Duration,
 	pub starttransfer_time: Duration,
 	pub total_time: Duration,
+	pub dns_resolution_time: Duration,
+	pub tcp_connection_time: Duration,
+	pub tls_connection_time: Duration,
+	pub server_processing_time: Duration,
+	pub content_transfer_time: Duration,
+}
+
+impl Timing {
+	pub fn new(handle: &mut Easy) -> Self {
+		let namelookup_time = handle.namelookup_time().unwrap();
+		let connect_time = handle.connect_time().unwrap();
+		let pretransfer_time = handle.pretransfer_time().unwrap();
+		let starttransfer_time = handle.starttransfer_time().unwrap();
+		let total_time = handle.total_time().unwrap();
+		let dns_resolution_time = namelookup_time;
+		let tcp_connection_time = connect_time - namelookup_time;
+		let tls_connection_time = pretransfer_time - connect_time;
+		let server_processing_time = starttransfer_time - pretransfer_time;
+		let content_transfer_time = total_time - starttransfer_time;
+
+		Self {
+			namelookup_time,
+			connect_time,
+			pretransfer_time,
+			starttransfer_time,
+			total_time,
+			dns_resolution_time,
+			tcp_connection_time,
+			tls_connection_time,
+			server_processing_time,
+			content_transfer_time,
+		}
+	}
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -183,17 +216,17 @@ pub fn httpstat(config: Config) -> Result<StatResult> {
 	}
 
 	Ok(StatResult {
-		http_version: http_response_header.as_ref().map_or_else(|| "Unknown".into(), |h| h.http_version.clone()),
-		response_code: http_response_header.as_ref().map_or(-1, |h| h.response_code),
-		response_message: http_response_header.as_ref().map_or(None, |h| h.response_message.clone()),
+		http_version: http_response_header
+			.as_ref()
+			.map_or_else(|| "Unknown".into(), |h| h.http_version.clone()),
+		response_code: http_response_header
+			.as_ref()
+			.map_or(-1, |h| h.response_code),
+		response_message: http_response_header
+			.as_ref()
+			.and_then(|h| h.response_message.clone()),
 		headers,
 		body,
-		timing: Timing {
-			namelookup_time: handle.namelookup_time()?,
-			connect_time: handle.connect_time()?,
-			pretransfer_time: handle.pretransfer_time()?,
-			starttransfer_time: handle.starttransfer_time()?,
-			total_time: handle.total_time()?,
-		},
+		timing: Timing::new(&mut handle),
 	})
 }
