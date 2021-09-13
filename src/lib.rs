@@ -133,7 +133,7 @@ pub struct StatResult {
 	pub body: Vec<u8>,
 }
 
-pub fn httpstat(config: Config) -> Result<StatResult> {
+pub fn httpstat(config: &Config) -> Result<StatResult> {
 	let mut handle = Easy::new();
 
 	handle.url(&config.url)?;
@@ -170,7 +170,7 @@ pub fn httpstat(config: Config) -> Result<StatResult> {
 		handle.post_field_size(post_data.len() as u64)?;
 	}
 
-	if let Some(config_headers) = config.headers {
+	if let Some(config_headers) = &config.headers {
 		let mut headers = List::new();
 		for header in config_headers {
 			headers.append(&header)?;

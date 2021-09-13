@@ -5,7 +5,7 @@ authors = ["Tyrone Tudehope <tyronetudehope@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-curl = { version = "0.4" }
+curl = { version = "0.4", default-features = false }
 eyre = "0.6"
 nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
@@ -13,7 +13,9 @@ structopt = "0.3"
 thiserror = "1.0"
 
 [features]
+default = ["curl/ssl"]
 ssl = ["curl/ssl"]
+mesalink = ["curl/mesalink"]
 http2 = ["curl/http2"]
 static-ssl = ["curl/static-ssl"]
 static-curl = ["curl/static-curl"]

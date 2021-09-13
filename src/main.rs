@@ -82,7 +82,7 @@ const GRAY: ColorFormatter = make_color!(38);
 
 fn execute() -> Result<()> {
 	let opt = Opt::from_args();
-	let result = httpstat(Config::from(opt.clone()))?;
+	let result = httpstat(&Config::from(opt.clone()))?;
 
 	println!(
 		"{}{}{}",
