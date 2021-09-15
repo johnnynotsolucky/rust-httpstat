@@ -5,13 +5,6 @@ use std::fs;
 use std::io::Read;
 use std::str;
 use std::time::Duration;
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum Error {
-	#[error("{0}")]
-	FromStrError(String),
-}
 
 #[derive(Debug, Clone)]
 pub struct Config {
