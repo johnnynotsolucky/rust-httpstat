@@ -181,7 +181,6 @@ pub fn httpstat(config: &Config) -> Result<StatResult> {
 		transfer.read_function(move |into| Ok(post_data.as_bytes().read(into).unwrap()))?;
 
 		transfer.write_function(|data| {
-			println!("{}", data.len());
 			body.extend_from_slice(data);
 			if let Some(max_response_size) = config.max_response_size {
 				if body.len() > max_response_size {
