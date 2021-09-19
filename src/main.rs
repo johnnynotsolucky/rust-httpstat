@@ -1,4 +1,4 @@
-use eyre::Result;
+use anyhow::Result;
 use nanoid::nanoid;
 use std::env;
 use std::fs::File;
@@ -36,11 +36,16 @@ struct Opt {
 	insecure: bool,
 
 	#[structopt(short = "o", long = "save-body")]
+	/// Save response body to a temporary file
 	save_body: bool,
 
 	#[structopt(short = "v", long = "verbose")]
 	/// Verbose output
 	verbose: bool,
+
+	#[structopt(name = "bytes", short = "s", long = "max-response-size")]
+	/// Maximum response size in bytes
+	max_response_size: Option<usize>,
 
 	/// URL to work with
 	url: String,
@@ -57,6 +62,7 @@ impl From<Opt> for Config {
 			insecure: opt.insecure,
 			url: opt.url,
 			verbose: opt.verbose,
+			max_response_size: opt.max_response_size,
 		}
 	}
 }

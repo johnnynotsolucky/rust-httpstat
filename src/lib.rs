@@ -1,5 +1,5 @@
+use anyhow::{anyhow, Result};
 use curl::easy::{Easy, List};
-use eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
@@ -16,6 +16,7 @@ pub struct Config {
 	pub insecure: bool,
 	pub url: String,
 	pub verbose: bool,
+	pub max_response_size: Option<usize>,
 }
 
 impl Default for Config {
@@ -29,6 +30,7 @@ impl Default for Config {
 			insecure: false,
 			url: "".into(),
 			verbose: false,
+			max_response_size: None,
 		}
 	}
 }
@@ -166,7 +168,7 @@ pub fn httpstat(config: &Config) -> Result<StatResult> {
 	if let Some(config_headers) = &config.headers {
 		let mut headers = List::new();
 		for header in config_headers {
-			headers.append(&header)?;
+			headers.append(header)?;
 		}
 		handle.http_headers(headers)?;
 	}
@@ -179,7 +181,13 @@ pub fn httpstat(config: &Config) -> Result<StatResult> {
 		transfer.read_function(move |into| Ok(post_data.as_bytes().read(into).unwrap()))?;
 
 		transfer.write_function(|data| {
+			println!("{}", data.len());
 			body.extend_from_slice(data);
+			if let Some(max_response_size) = config.max_response_size {
+				if body.len() > max_response_size {
+					return Ok(0);
+				}
+			}
 			Ok(data.len())
 		})?;
 
@@ -189,7 +197,13 @@ pub fn httpstat(config: &Config) -> Result<StatResult> {
 			true
 		})?;
 
-		transfer.perform()?;
+		if let Err(error) = transfer.perform() {
+			if error.is_write_error() {
+				return Err(anyhow!("Maximum response size reached"));
+			}
+
+			return Err(error.into());
+		}
 	}
 
 	let mut http_response_header: Option<HttpResponseHeader> = None;
