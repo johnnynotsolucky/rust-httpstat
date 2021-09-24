@@ -1,9 +1,13 @@
 use anyhow::{anyhow, Result};
-use curl::easy::{Easy, List};
+use curl::easy::{Easy2, Handler, List, ReadError, WriteError};
+use curl::multi::{Easy2Handle, Multi};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::future::Future;
 use std::io::Read;
+use std::pin::Pin;
 use std::str;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -91,7 +95,7 @@ pub struct Timing {
 }
 
 impl Timing {
-	pub fn new(handle: &mut Easy) -> Self {
+	pub fn new(handle: &mut Easy2Handle<Collector>) -> Self {
 		let namelookup_time = handle.namelookup_time().unwrap();
 		let connect_time = handle.connect_time().unwrap();
 		let pretransfer_time = handle.pretransfer_time().unwrap();
@@ -128,11 +132,93 @@ pub struct StatResult {
 	pub body: Vec<u8>,
 }
 
-pub fn httpstat(config: &Config) -> Result<StatResult> {
-	let mut handle = Easy::new();
+pub struct Collector<'a> {
+	config: &'a Config,
+	headers: &'a mut Vec<u8>,
+	data: &'a mut Vec<u8>,
+}
+
+impl<'a> Collector<'a> {
+	pub fn new(config: &'a Config, data: &'a mut Vec<u8>, headers: &'a mut Vec<u8>) -> Self {
+		Self {
+			config,
+			data,
+			headers,
+		}
+	}
+}
+
+// TODO shouldn't need to call this twice
+fn get_upload_data(data: &Option<String>) -> Result<Option<String>> {
+	match data {
+		Some(ref data) => match data.strip_prefix('@') {
+			Some(data) => match fs::read_to_string(data) {
+				Ok(data) => Ok(Some(data)),
+				Err(error) => Err(error.into()),
+			},
+			None => Ok(Some(data.clone())),
+		},
+		None => Ok(None),
+	}
+}
+
+impl<'a> Handler for Collector<'a> {
+	fn write(&mut self, data: &[u8]) -> Result<usize, WriteError> {
+		self.data.extend_from_slice(data);
+		if let Some(ref max_response_size) = self.config.max_response_size {
+			if self.data.len() > *max_response_size {
+				return Ok(0);
+			}
+		}
+		Ok(data.len())
+	}
+
+	fn read(&mut self, into: &mut [u8]) -> Result<usize, ReadError> {
+		match get_upload_data(&self.config.data) {
+			Ok(data) => match data {
+				Some(data) => Ok(data.as_bytes().read(into).unwrap()),
+				None => Ok(0),
+			},
+			Err(_error) => Err(ReadError::Abort),
+		}
+	}
+
+	fn header(&mut self, data: &[u8]) -> bool {
+		self.headers.extend_from_slice(data);
+		true
+	}
+}
+
+pub struct HttpstatFuture<'a>(&'a Multi);
+
+impl<'a> Future for HttpstatFuture<'a> {
+	type Output = Result<()>;
+
+	fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+		// TODO I don't know about this wait time. Should it be shorter or longer?
+		self.0.wait(&mut [], Duration::from_millis(10))?;
+		match self.0.perform() {
+			Ok(running) => {
+				if running > 0 {
+					context.waker().wake_by_ref();
+					Poll::Pending
+				} else {
+					Poll::Ready(Ok(()))
+				}
+			}
+			Err(error) => Poll::Ready(Err(error.into())),
+		}
+	}
+}
+
+pub async fn httpstat(config: &Config) -> Result<StatResult> {
+	let mut body = Vec::new();
+	let mut headers = Vec::new();
+	let mut handle = Easy2::new(Collector::new(config, &mut body, &mut headers));
 
 	handle.url(&config.url)?;
-	handle.show_header(true)?;
+	handle.show_header(false)?;
+	handle.progress(true)?;
 	handle.verbose(config.verbose)?;
 
 	if config.insecure {
@@ -150,19 +236,13 @@ pub fn httpstat(config: &Config) -> Result<StatResult> {
 
 	handle.custom_request(&config.request.to_uppercase())?;
 
-	let post_data = if let Some(ref data) = config.data {
-		if let Some(data) = data.strip_prefix('@') {
-			fs::read_to_string(data)?
-		} else {
-			data.clone()
-		}
-	} else {
-		"".into()
-	};
-
 	if config.data.is_some() {
 		handle.post(true)?;
-		handle.post_field_size(post_data.len() as u64)?;
+		handle.post_field_size(
+			get_upload_data(&config.data)?
+				.unwrap_or_else(|| "".into())
+				.len() as u64,
+		)?;
 	}
 
 	if let Some(config_headers) = &config.headers {
@@ -173,43 +253,35 @@ pub fn httpstat(config: &Config) -> Result<StatResult> {
 		handle.http_headers(headers)?;
 	}
 
-	let mut body = Vec::new();
-	let mut header_lines = Vec::new();
-	{
-		let mut transfer = handle.transfer();
+	let multi = Multi::new();
+	let mut handle = multi.add2(handle)?;
+	HttpstatFuture(&multi).await?;
 
-		transfer.read_function(move |into| Ok(post_data.as_bytes().read(into).unwrap()))?;
-
-		transfer.write_function(|data| {
-			body.extend_from_slice(data);
-			if let Some(max_response_size) = config.max_response_size {
-				if body.len() > max_response_size {
-					return Ok(0);
+	// hmmm
+	let mut transfer_result: Result<()> = Ok(());
+	multi.messages(|m| {
+		if let Ok(()) = transfer_result {
+			if let Some(Err(error)) = m.result_for2(&handle) {
+				if error.is_write_error() {
+					transfer_result = Err(anyhow!("Maximum response size reached"));
+				} else {
+					transfer_result = Err(error.into());
 				}
 			}
-			Ok(data.len())
-		})?;
-
-		transfer.header_function(|header| {
-			let header_str = str::from_utf8(header).unwrap().to_string();
-			header_lines.push(header_str);
-			true
-		})?;
-
-		if let Err(error) = transfer.perform() {
-			if error.is_write_error() {
-				return Err(anyhow!("Maximum response size reached"));
-			}
-
-			return Err(error.into());
 		}
-	}
+	});
+	transfer_result?;
+
+	let timing = Timing::new(&mut handle);
+	// Force handler to drop so we can access the body references held by the collector
+	drop(handle);
+
+	let header_lines = str::from_utf8(&headers[..])?.lines();
 
 	let mut http_response_header: Option<HttpResponseHeader> = None;
 	let mut headers: Vec<Header> = Vec::new();
 
 	let header_iter = header_lines
-		.iter()
 		.map(|line| line.replace("\r", "").replace("\n", ""))
 		.filter(|line| !line.is_empty());
 
@@ -233,6 +305,6 @@ pub fn httpstat(config: &Config) -> Result<StatResult> {
 			.and_then(|h| h.response_message.clone()),
 		headers,
 		body,
-		timing: Timing::new(&mut handle),
+		timing,
 	})
 }

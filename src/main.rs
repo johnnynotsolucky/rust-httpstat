@@ -1,4 +1,5 @@
 use anyhow::Result;
+use futures::executor::block_on;
 use nanoid::nanoid;
 use std::env;
 use std::fs::File;
@@ -88,7 +89,7 @@ const GRAY: ColorFormatter = make_color!(38);
 
 fn execute() -> Result<()> {
 	let opt = Opt::from_args();
-	let result = httpstat(&Config::from(opt.clone()))?;
+	let result = block_on(httpstat(&Config::from(opt.clone())))?;
 
 	println!(
 		"{}{}{}",
