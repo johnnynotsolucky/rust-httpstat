@@ -195,8 +195,6 @@ impl<'a> Future for HttpstatFuture<'a> {
 	type Output = Result<()>;
 
 	fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-		// TODO I don't know about this wait time. Should it be shorter or longer?
-		self.0.wait(&mut [], Duration::from_millis(10))?;
 		match self.0.perform() {
 			Ok(running) => {
 				if running > 0 {
@@ -211,6 +209,7 @@ impl<'a> Future for HttpstatFuture<'a> {
 	}
 }
 
+// TODO now make a sync version
 pub async fn httpstat(config: &Config) -> Result<StatResult> {
 	let mut body = Vec::new();
 	let mut headers = Vec::new();
