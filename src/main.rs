@@ -2,7 +2,7 @@ use anyhow::Result;
 use futures::executor::block_on;
 use nanoid::nanoid;
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Write;
 use std::time::Duration;
 use structopt::StructOpt;
@@ -20,9 +20,14 @@ struct Opt {
 	/// Maximum time allowed for connection
 	connect_timeout: Option<u64>,
 
-	#[structopt(name = "command", short = "X", long = "request", default_value = "GET")]
-	/// Specify request command to use
-	request: String,
+	#[structopt(
+		name = "command",
+		short = "X",
+		long = "request-method",
+		default_value = "GET"
+	)]
+	/// Specify request method to use
+	request_method: String,
 
 	#[structopt(short = "d", long = "data")]
 	/// HTTP POST data
@@ -52,12 +57,25 @@ struct Opt {
 	url: String,
 }
 
+fn get_upload_data(data: Option<String>) -> Result<Option<String>> {
+	match data {
+		Some(data) => match data.strip_prefix('@') {
+			Some(data) => match fs::read_to_string(data) {
+				Ok(data) => Ok(Some(data)),
+				Err(error) => Err(error.into()),
+			},
+			None => Ok(Some(data)),
+		},
+		None => Ok(None),
+	}
+}
+
 impl From<Opt> for Config {
 	fn from(opt: Opt) -> Self {
 		Self {
 			location: opt.location,
 			connect_timeout: opt.connect_timeout.map(Duration::from_millis),
-			request: opt.request,
+			request_method: opt.request_method.into(),
 			data: opt.data,
 			headers: opt.headers,
 			insecure: opt.insecure,
@@ -88,7 +106,9 @@ const CYAN: ColorFormatter = make_color!(36);
 const GRAY: ColorFormatter = make_color!(38);
 
 fn execute() -> Result<()> {
-	let opt = Opt::from_args();
+	let mut opt = Opt::from_args();
+	opt.data = get_upload_data(opt.data)?;
+
 	let result = block_on(httpstat(&Config::from(opt.clone())))?;
 
 	println!(
@@ -118,9 +138,13 @@ fn execute() -> Result<()> {
 	if opt.save_body {
 		let tmpfile_name = nanoid!(6, &nanoid::alphabet::SAFE); //=> "93ce_Ltuub"
 		let tmpfile_path = format!("{}/tmp{}", env::temp_dir().to_str().unwrap(), tmpfile_name);
-		let mut tmpfile = File::create(tmpfile_path.clone())?;
+		let mut tmpfile = File::create(&tmpfile_path)?;
 		tmpfile.write_all(&result.body[..])?;
-		println!("\n{} stored in {}", GREEN("Body".to_string()), tmpfile_path);
+		println!(
+			"\n{} stored in {}",
+			GREEN("Body".to_string()),
+			&tmpfile_path
+		);
 	}
 
 	let format_a = make_color_formatter!(CYAN, "{:^7}"); //make_a_formatter();

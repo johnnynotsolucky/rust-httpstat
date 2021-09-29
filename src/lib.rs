@@ -2,7 +2,6 @@ use anyhow::{anyhow, Result};
 use curl::easy::{Easy2, Handler, List, ReadError, WriteError};
 use curl::multi::{Easy2Handle, Multi};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::future::Future;
 use std::io::Read;
 use std::pin::Pin;
@@ -11,10 +10,60 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
+pub enum RequestMethod {
+	// TODO Support CONNECT - https://curl.se/libcurl/c/CURLOPT_HTTPPROXYTUNNEL.html
+	// Connect,
+	Delete,
+	Get,
+	Head,
+	Options,
+	Patch,
+	Post,
+	Put,
+	Trace,
+	Custom(String),
+}
+
+impl<'a> From<&'a RequestMethod> for &'a str {
+	fn from(request_method: &'a RequestMethod) -> &'a str {
+		match request_method {
+			// RequestMethod::Connect => "CONNECT",
+			RequestMethod::Delete => "DELETE",
+			RequestMethod::Get => "GET",
+			RequestMethod::Head => "HEAD",
+			RequestMethod::Options => "OPTIONS",
+			RequestMethod::Patch => "PATCH",
+			RequestMethod::Post => "POST",
+			RequestMethod::Put => "PUT",
+			RequestMethod::Trace => "TRACE",
+			RequestMethod::Custom(request_method) => request_method,
+		}
+	}
+}
+
+impl From<String> for RequestMethod {
+	fn from(request_method: String) -> Self {
+		let request_method = request_method.to_uppercase();
+		match request_method.as_str() {
+			// "CONNECT" => Self::Connect,
+			"DELETE" => RequestMethod::Delete,
+			"GET" => RequestMethod::Get,
+			"HEAD" => RequestMethod::Head,
+			"OPTIONS" => RequestMethod::Options,
+			"PATCH" => RequestMethod::Patch,
+			"POST" => RequestMethod::Post,
+			"PUT" => RequestMethod::Put,
+			"TRACE" => RequestMethod::Trace,
+			_ => Self::Custom(request_method),
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
 	pub location: bool,
 	pub connect_timeout: Option<Duration>,
-	pub request: String,
+	pub request_method: RequestMethod,
 	pub data: Option<String>,
 	pub headers: Option<Vec<String>>,
 	pub insecure: bool,
@@ -28,7 +77,7 @@ impl Default for Config {
 		Self {
 			location: false,
 			connect_timeout: None,
-			request: "GET".into(),
+			request_method: RequestMethod::Get,
 			data: None,
 			headers: None,
 			insecure: false,
@@ -148,20 +197,6 @@ impl<'a> Collector<'a> {
 	}
 }
 
-// TODO shouldn't need to call this twice
-fn get_upload_data(data: &Option<String>) -> Result<Option<String>> {
-	match data {
-		Some(ref data) => match data.strip_prefix('@') {
-			Some(data) => match fs::read_to_string(data) {
-				Ok(data) => Ok(Some(data)),
-				Err(error) => Err(error.into()),
-			},
-			None => Ok(Some(data.clone())),
-		},
-		None => Ok(None),
-	}
-}
-
 impl<'a> Handler for Collector<'a> {
 	fn write(&mut self, data: &[u8]) -> Result<usize, WriteError> {
 		self.data.extend_from_slice(data);
@@ -174,12 +209,9 @@ impl<'a> Handler for Collector<'a> {
 	}
 
 	fn read(&mut self, into: &mut [u8]) -> Result<usize, ReadError> {
-		match get_upload_data(&self.config.data) {
-			Ok(data) => match data {
-				Some(data) => Ok(data.as_bytes().read(into).unwrap()),
-				None => Ok(0),
-			},
-			Err(_error) => Err(ReadError::Abort),
+		match &self.config.data {
+			Some(data) => Ok(data.as_bytes().read(into).unwrap()),
+			None => Ok(0),
 		}
 	}
 
@@ -233,15 +265,29 @@ pub async fn httpstat(config: &Config) -> Result<StatResult> {
 		handle.connect_timeout(connect_timeout)?;
 	}
 
-	handle.custom_request(&config.request.to_uppercase())?;
+	let data_len = config.data.as_ref().map(|data| data.len() as u64);
 
-	if config.data.is_some() {
-		handle.post(true)?;
-		handle.post_field_size(
-			get_upload_data(&config.data)?
-				.unwrap_or_else(|| "".into())
-				.len() as u64,
-		)?;
+	let request_method = &config.request_method;
+	match request_method {
+		RequestMethod::Put => {
+			handle.upload(true)?;
+			if let Some(data_len) = data_len {
+				handle.in_filesize(data_len)?;
+			}
+		}
+		RequestMethod::Get => handle.get(true)?,
+		RequestMethod::Head => handle.nobody(true)?,
+		RequestMethod::Post => handle.post(true)?,
+		_ => handle.custom_request(request_method.into())?,
+	}
+
+	// Set post_field_size for anything other than a PUT request if the user has passed in data.
+	// Note: https://httpwg.org/specs/rfc7231.html#method.definitions
+	// > A payload within a {METHOD} request message has no defined semantics; sending a payload
+	// > body on a {METHOD} request might cause some existing implementations to reject the
+	// > request.
+	if data_len.is_some() && !matches!(request_method, RequestMethod::Put) {
+		handle.post_field_size(data_len.unwrap())?;
 	}
 
 	if let Some(config_headers) = &config.headers {
