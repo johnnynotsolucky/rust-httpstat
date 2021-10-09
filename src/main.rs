@@ -162,16 +162,16 @@ fn execute() -> Result<()> {
                                                       starttransfer:{b0003}          |
                                                                                  total:{b0004}
 "#,
-			a0000 = format_a(result.timing.dns_resolution_time),
-			a0001 = format_a(result.timing.tcp_connection_time),
-			a0002 = format_a(result.timing.tls_connection_time),
-			a0003 = format_a(result.timing.server_processing_time),
-			a0004 = format_a(result.timing.content_transfer_time),
-			b0000 = format_b(result.timing.namelookup_time),
-			b0001 = format_b(result.timing.connect_time),
-			b0002 = format_b(result.timing.pretransfer_time),
-			b0003 = format_b(result.timing.starttransfer_time),
-			b0004 = format_b(result.timing.total_time)
+			a0000 = format_a(result.timing.dns_resolution),
+			a0001 = format_a(result.timing.tcp_connection),
+			a0002 = format_a(result.timing.tls_connection),
+			a0003 = format_a(result.timing.server_processing),
+			a0004 = format_a(result.timing.content_transfer),
+			b0000 = format_b(result.timing.namelookup),
+			b0001 = format_b(result.timing.connect),
+			b0002 = format_b(result.timing.pretransfer),
+			b0003 = format_b(result.timing.starttransfer),
+			b0004 = format_b(result.timing.total)
 		)
 	} else {
 		format!(
@@ -184,14 +184,14 @@ fn execute() -> Result<()> {
                                       starttransfer:{b0003}          |
                                                                  total:{b0004}
 "#,
-			a0000 = format_a(result.timing.dns_resolution_time),
-			a0001 = format_a(result.timing.tcp_connection_time),
-			a0003 = format_a(result.timing.server_processing_time),
-			a0004 = format_a(result.timing.content_transfer_time),
-			b0000 = format_b(result.timing.namelookup_time),
-			b0001 = format_b(result.timing.connect_time),
-			b0003 = format_b(result.timing.starttransfer_time),
-			b0004 = format_b(result.timing.total_time)
+			a0000 = format_a(result.timing.dns_resolution),
+			a0001 = format_a(result.timing.tcp_connection),
+			a0003 = format_a(result.timing.server_processing),
+			a0004 = format_a(result.timing.content_transfer),
+			b0000 = format_b(result.timing.namelookup),
+			b0001 = format_b(result.timing.connect),
+			b0003 = format_b(result.timing.starttransfer),
+			b0004 = format_b(result.timing.total)
 		)
 	};
 

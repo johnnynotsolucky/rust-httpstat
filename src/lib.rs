@@ -131,42 +131,42 @@ impl From<String> for HttpResponseHeader {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Timing {
-	pub namelookup_time: Duration,
-	pub connect_time: Duration,
-	pub pretransfer_time: Duration,
-	pub starttransfer_time: Duration,
-	pub total_time: Duration,
-	pub dns_resolution_time: Duration,
-	pub tcp_connection_time: Duration,
-	pub tls_connection_time: Duration,
-	pub server_processing_time: Duration,
-	pub content_transfer_time: Duration,
+	pub namelookup: Duration,
+	pub connect: Duration,
+	pub pretransfer: Duration,
+	pub starttransfer: Duration,
+	pub total: Duration,
+	pub dns_resolution: Duration,
+	pub tcp_connection: Duration,
+	pub tls_connection: Duration,
+	pub server_processing: Duration,
+	pub content_transfer: Duration,
 }
 
 impl Timing {
 	pub fn new(handle: &mut Easy2Handle<Collector>) -> Self {
-		let namelookup_time = handle.namelookup_time().unwrap();
-		let connect_time = handle.connect_time().unwrap();
-		let pretransfer_time = handle.pretransfer_time().unwrap();
-		let starttransfer_time = handle.starttransfer_time().unwrap();
-		let total_time = handle.total_time().unwrap();
-		let dns_resolution_time = namelookup_time;
-		let tcp_connection_time = connect_time - namelookup_time;
-		let tls_connection_time = pretransfer_time - connect_time;
-		let server_processing_time = starttransfer_time - pretransfer_time;
-		let content_transfer_time = total_time - starttransfer_time;
+		let namelookup = handle.namelookup_time().unwrap();
+		let connect = handle.connect_time().unwrap();
+		let pretransfer = handle.pretransfer_time().unwrap();
+		let starttransfer = handle.starttransfer_time().unwrap();
+		let total = handle.total_time().unwrap();
+		let dns_resolution = namelookup;
+		let tcp_connection = connect - namelookup;
+		let tls_connection = pretransfer - connect;
+		let server_processing = starttransfer - pretransfer;
+		let content_transfer = total - starttransfer;
 
 		Self {
-			namelookup_time,
-			connect_time,
-			pretransfer_time,
-			starttransfer_time,
-			total_time,
-			dns_resolution_time,
-			tcp_connection_time,
-			tls_connection_time,
-			server_processing_time,
-			content_transfer_time,
+			namelookup,
+			connect,
+			pretransfer,
+			starttransfer,
+			total,
+			dns_resolution,
+			tcp_connection,
+			tls_connection,
+			server_processing,
+			content_transfer,
 		}
 	}
 }
