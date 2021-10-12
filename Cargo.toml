@@ -1,5 +1,5 @@
 [package]
-name = "httpstat"
+name = "rust-httpstat"
 version = "0.1.0"
 authors = ["Tyrone Tudehope <tyronetudehope@gmail.com>"]
 edition = "2018"
@@ -22,3 +22,10 @@ ssl = ["curl/ssl"]
 http2 = ["curl/http2"]
 static-ssl = ["curl/static-ssl"]
 static-curl = ["curl/static-curl"]
+
+[lib]
+name = "httpstat"
+
+[[bin]]
+name = "httpstat"
+path = "src/main.rs"
