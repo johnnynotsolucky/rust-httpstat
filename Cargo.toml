@@ -3,6 +3,10 @@ name = "httpstat"
 version = "0.1.0"
 authors = ["Tyrone Tudehope <tyronetudehope@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "Httpstat written in Rust"
+repository = "https://github.com/johnnynotsolucky/rust-httpstat"
+readme = "README.md"
 
 [dependencies]
 curl = { version = "0.4", default-features = false }
