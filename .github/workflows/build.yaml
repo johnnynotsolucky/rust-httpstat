@@ -34,7 +34,7 @@ jobs:
       run: cargo build --package rust-httpstat --release
 
     - name: Run cargo build main
-      run: cargo build --all --release && strip target/release/rust-httpstat
+      run: cargo build --all --release && strip target/release/httpstat
 
   test:
     runs-on: ubuntu-latest
