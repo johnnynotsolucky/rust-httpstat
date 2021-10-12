@@ -1,11 +1,12 @@
 use anyhow::{anyhow, Result};
+use core::fmt;
 use curl::easy::{Easy2, Handler, List, ReadError, WriteError};
 use curl::multi::{Easy2Handle, Multi};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::io::Read;
 use std::pin::Pin;
-use std::str;
+use std::str::{self, FromStr};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -65,7 +66,7 @@ pub struct Config {
 	pub connect_timeout: Option<Duration>,
 	pub request_method: RequestMethod,
 	pub data: Option<String>,
-	pub headers: Option<Vec<String>>,
+	pub headers: Option<Vec<Header>>,
 	pub insecure: bool,
 	pub url: String,
 	pub verbose: bool,
@@ -94,12 +95,21 @@ pub struct Header {
 	pub value: String,
 }
 
-impl From<String> for Header {
-	fn from(line: String) -> Self {
-		let header_tuple: (&str, &str) = line.split_once(':').unwrap();
-		Self {
-			name: header_tuple.0.into(),
-			value: header_tuple.1.trim().into(),
+impl fmt::Display for Header {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}: {}", self.name, self.value)
+	}
+}
+
+impl FromStr for Header {
+	type Err = anyhow::Error;
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s.split_once(':') {
+			Some(header_tuple) => Ok(Self {
+				name: header_tuple.0.into(),
+				value: header_tuple.1.trim().into(),
+			}),
+			None => Err(anyhow!("Invalid header \"{}\"", s)),
 		}
 	}
 }
@@ -293,7 +303,7 @@ pub async fn httpstat(config: &Config) -> Result<StatResult> {
 	if let Some(config_headers) = &config.headers {
 		let mut headers = List::new();
 		for header in config_headers {
-			headers.append(header)?;
+			headers.append(&header.to_string())?;
 		}
 		handle.http_headers(headers)?;
 	}
@@ -333,8 +343,8 @@ pub async fn httpstat(config: &Config) -> Result<StatResult> {
 	for line in header_iter {
 		if line.to_uppercase().starts_with("HTTP/") {
 			http_response_header = Some(HttpResponseHeader::from(line.to_string()));
-		} else {
-			headers.push(Header::from(line.to_string()));
+		} else if let Ok(header) = Header::from_str(&line) {
+			headers.push(header);
 		}
 	}
 

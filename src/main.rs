@@ -7,7 +7,7 @@ use std::io::Write;
 use std::time::Duration;
 use structopt::StructOpt;
 
-use httpstat::{httpstat, Config};
+use httpstat::{httpstat, Config, Header};
 
 #[derive(Debug, Clone, StructOpt)]
 #[structopt()]
@@ -35,7 +35,7 @@ struct Opt {
 
 	#[structopt(short = "H", long = "header")]
 	/// Pass custom header(s) to server
-	headers: Option<Vec<String>>,
+	headers: Option<Vec<Header>>,
 
 	#[structopt(short = "k", long = "insecure")]
 	/// Allow insecure server connections when using SSL
