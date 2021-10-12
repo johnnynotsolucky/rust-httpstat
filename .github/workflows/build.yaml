@@ -31,10 +31,10 @@ jobs:
         key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Run cargo build common
-      run: cargo build --package httpstat --release
+      run: cargo build --package rust-httpstat --release
 
     - name: Run cargo build main
-      run: cargo build --all --release && strip target/release/httpstat
+      run: cargo build --all --release && strip target/release/rust-httpstat
 
   test:
     runs-on: ubuntu-latest
