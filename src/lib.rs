@@ -300,7 +300,7 @@ pub async fn httpstat(config: &Config) -> Result<StatResult> {
 		handle.post_field_size(data_len.unwrap())?;
 	}
 
-	if !Vec::is_empty(&config.headers) {
+	if !&config.headers.is_empty() {
 		let mut headers = List::new();
 		for header in &config.headers {
 			headers.append(&header.to_string())?;
