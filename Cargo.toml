@@ -1,6 +1,6 @@
 [package]
 name = "rust-httpstat"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Tyrone Tudehope <tyronetudehope@gmail.com>"]
 edition = "2018"
 license = "MIT"

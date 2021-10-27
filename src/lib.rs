@@ -66,7 +66,7 @@ pub struct Config {
 	pub connect_timeout: Option<Duration>,
 	pub request_method: RequestMethod,
 	pub data: Option<String>,
-	pub headers: Option<Vec<Header>>,
+	pub headers: Vec<Header>,
 	pub insecure: bool,
 	pub url: String,
 	pub verbose: bool,
@@ -80,7 +80,7 @@ impl Default for Config {
 			connect_timeout: None,
 			request_method: RequestMethod::Get,
 			data: None,
-			headers: None,
+			headers: Vec::new(),
 			insecure: false,
 			url: "".into(),
 			verbose: false,
@@ -300,9 +300,9 @@ pub async fn httpstat(config: &Config) -> Result<StatResult> {
 		handle.post_field_size(data_len.unwrap())?;
 	}
 
-	if let Some(config_headers) = &config.headers {
+	if !Vec::is_empty(&config.headers) {
 		let mut headers = List::new();
-		for header in config_headers {
+		for header in &config.headers {
 			headers.append(&header.to_string())?;
 		}
 		handle.http_headers(headers)?;

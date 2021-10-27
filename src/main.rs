@@ -35,7 +35,7 @@ struct Opt {
 
 	#[structopt(short = "H", long = "header")]
 	/// Pass custom header(s) to server
-	headers: Option<Vec<Header>>,
+	headers: Vec<Header>,
 
 	#[structopt(short = "k", long = "insecure")]
 	/// Allow insecure server connections when using SSL
