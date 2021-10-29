@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+cargo fmt
+
+cargo clippy --all-features -- \
+  -D warnings \
+  -D deprecated \
+  -D clippy::perf \
+  -D clippy::complexity \
+  -D clippy::dbg_macro
+
+cargo test

@@ -12,45 +12,57 @@ use httpstat::{httpstat, Config, Header};
 #[derive(Debug, Clone, StructOpt)]
 #[structopt()]
 struct Opt {
-	#[structopt(short = "L", long = "location")]
 	/// Follow redirects
+	#[structopt(short = "L", long = "location")]
 	location: bool,
 
-	#[structopt(name = "millis", long = "connect-timeout")]
 	/// Maximum time allowed for connection
+	#[structopt(name = "millis", long = "connect-timeout")]
 	connect_timeout: Option<u64>,
 
+	/// Specify request method to use
 	#[structopt(
 		name = "command",
 		short = "X",
 		long = "request-method",
 		default_value = "GET"
 	)]
-	/// Specify request method to use
 	request_method: String,
 
-	#[structopt(short = "d", long = "data")]
 	/// HTTP POST data
+	#[structopt(short = "d", long = "data")]
 	data: Option<String>,
 
-	#[structopt(short = "H", long = "header")]
 	/// Pass custom header(s) to server
+	#[structopt(short = "H", long = "header")]
 	headers: Vec<Header>,
 
-	#[structopt(short = "k", long = "insecure")]
 	/// Allow insecure server connections when using SSL
+	#[structopt(short = "k", long = "insecure")]
 	insecure: bool,
 
-	#[structopt(short = "o", long = "save-body")]
+	/// Client certificate file
+	#[structopt(name = "cert file", short = "E", long = "cert")]
+	client_cert: Option<String>,
+
+	/// Private key file
+	#[structopt(name = "key file", long = "key")]
+	client_key: Option<String>,
+
+	/// CA certificate to verify against
+	#[structopt(name = "ca file", long = "cacert")]
+	ca_cert: Option<String>,
+
 	/// Save response body to a temporary file
+	#[structopt(short = "o", long = "save-body")]
 	save_body: bool,
 
-	#[structopt(short = "v", long = "verbose")]
 	/// Verbose output
+	#[structopt(short = "v", long = "verbose")]
 	verbose: bool,
 
-	#[structopt(name = "bytes", short = "s", long = "max-response-size")]
 	/// Maximum response size in bytes
+	#[structopt(name = "bytes", short = "s", long = "max-response-size")]
 	max_response_size: Option<usize>,
 
 	/// URL to work with
@@ -79,6 +91,9 @@ impl From<Opt> for Config {
 			data: opt.data,
 			headers: opt.headers,
 			insecure: opt.insecure,
+			client_cert: opt.client_cert,
+			client_key: opt.client_key,
+			ca_cert: opt.ca_cert,
 			url: opt.url,
 			verbose: opt.verbose,
 			max_response_size: opt.max_response_size,

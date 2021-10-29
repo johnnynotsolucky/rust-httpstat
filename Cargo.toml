@@ -1,6 +1,6 @@
 [package]
 name = "rust-httpstat"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Tyrone Tudehope <tyronetudehope@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -16,6 +16,11 @@ nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 structopt = "0.3"
 
+[dev-dependencies.cargo-husky]
+version = "1.5"
+default-features = false
+features = ["user-hooks"]
+
 [features]
 default = ["ssl", "http2"]
 ssl = ["curl/ssl"]
@@ -29,3 +34,6 @@ name = "httpstat"
 [[bin]]
 name = "httpstat"
 path = "src/main.rs"
+
+[package.metadata.cargo-udeps.ignore]
+development = ["cargo-husky"]

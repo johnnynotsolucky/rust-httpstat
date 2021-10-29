@@ -81,7 +81,13 @@ jobs:
         key: ${{ runner.os }}-cargo-debug-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Run clippy
-      run: cargo clippy -- -D warnings
+      run: |
+        cargo clippy --all-features -- \
+          -D warnings \
+          -D deprecated \
+          -D clippy::perf \
+          -D clippy::complexity \
+          -D clippy::dbg_macro
 
   format:
     runs-on: ubuntu-latest

@@ -10,10 +10,16 @@ use std::str::{self, FromStr};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+macro_rules! set_handle_optional {
+	($field:expr, $handle:ident, $fn:ident) => {
+		if let Some(f) = $field {
+			$handle.$fn(f)?;
+		}
+	};
+}
+
 #[derive(Debug, Clone)]
 pub enum RequestMethod {
-	// TODO Support CONNECT - https://curl.se/libcurl/c/CURLOPT_HTTPPROXYTUNNEL.html
-	// Connect,
 	Delete,
 	Get,
 	Head,
@@ -28,7 +34,6 @@ pub enum RequestMethod {
 impl<'a> From<&'a RequestMethod> for &'a str {
 	fn from(request_method: &'a RequestMethod) -> &'a str {
 		match request_method {
-			// RequestMethod::Connect => "CONNECT",
 			RequestMethod::Delete => "DELETE",
 			RequestMethod::Get => "GET",
 			RequestMethod::Head => "HEAD",
@@ -68,6 +73,9 @@ pub struct Config {
 	pub data: Option<String>,
 	pub headers: Vec<Header>,
 	pub insecure: bool,
+	pub client_cert: Option<String>,
+	pub client_key: Option<String>,
+	pub ca_cert: Option<String>,
 	pub url: String,
 	pub verbose: bool,
 	pub max_response_size: Option<usize>,
@@ -76,15 +84,18 @@ pub struct Config {
 impl Default for Config {
 	fn default() -> Self {
 		Self {
-			location: false,
-			connect_timeout: None,
+			location: Default::default(),
+			connect_timeout: Default::default(),
 			request_method: RequestMethod::Get,
-			data: None,
-			headers: Vec::new(),
-			insecure: false,
-			url: "".into(),
-			verbose: false,
-			max_response_size: None,
+			data: Default::default(),
+			headers: Default::default(),
+			insecure: Default::default(),
+			client_cert: Default::default(),
+			client_key: Default::default(),
+			ca_cert: Default::default(),
+			url: Default::default(),
+			verbose: Default::default(),
+			max_response_size: Default::default(),
 		}
 	}
 }
@@ -251,7 +262,6 @@ impl<'a> Future for HttpstatFuture<'a> {
 	}
 }
 
-// TODO now make a sync version
 pub async fn httpstat(config: &Config) -> Result<StatResult> {
 	let mut body = Vec::new();
 	let mut headers = Vec::new();
@@ -267,12 +277,13 @@ pub async fn httpstat(config: &Config) -> Result<StatResult> {
 		handle.ssl_verify_peer(false)?;
 	}
 
+	set_handle_optional!(&config.client_cert, handle, ssl_cert);
+	set_handle_optional!(&config.client_key, handle, ssl_key);
+	set_handle_optional!(&config.ca_cert, handle, cainfo);
+	set_handle_optional!(config.connect_timeout, handle, connect_timeout);
+
 	if config.location {
 		handle.follow_location(true)?;
-	}
-
-	if let Some(connect_timeout) = config.connect_timeout {
-		handle.connect_timeout(connect_timeout)?;
 	}
 
 	let data_len = config.data.as_ref().map(|data| data.len() as u64);
@@ -281,9 +292,7 @@ pub async fn httpstat(config: &Config) -> Result<StatResult> {
 	match request_method {
 		RequestMethod::Put => {
 			handle.upload(true)?;
-			if let Some(data_len) = data_len {
-				handle.in_filesize(data_len)?;
-			}
+			set_handle_optional!(data_len, handle, in_filesize);
 		}
 		RequestMethod::Get => handle.get(true)?,
 		RequestMethod::Head => handle.nobody(true)?,
